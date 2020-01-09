@@ -74,6 +74,10 @@ class BagAttention(BagRE):
             pos1: (nsum, L), relative position to head entity
             pos2: (nsum, L), relative position to tail entity
             mask: (nsum, L), used for piece-wise CNN
+            nsum表示样本数量，B表示每个batch还有几个bag
+            N表示关系数量
+            
+            mask: (nsum, L), used for piece-wise CNN
         Return:
             logits, (B, N)
         """
@@ -100,6 +104,11 @@ class BagAttention(BagRE):
         # Attention
         if train:
             if bag_size == 0:
+                # weight是不同关系对应的嵌入矩阵，(N, H)
+                # 计算过程是从关系嵌入矩阵取得每个bag对应关系的向量，同一个bag中每个句子对应同一个关系向量RE(B, H)
+                # 每个句子经过不同模型得到的嵌入向量SE(B, H)进行点积运算，并对H维度求和得到attention score
+                # 接着在对每个bag中的句子根据attention score做加权平均，得到每个bag包含句子对应的综合向量
+                # 接着dropout，最后经过全连接层进行关系分类
                 bag_rep = []
                 query = torch.zeros((rep.size(0))).long()
                 if torch.cuda.is_available():
