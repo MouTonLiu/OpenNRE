@@ -102,6 +102,8 @@ class BagAttention(BagRE):
             rep = self.sentence_encoder(token, pos1, pos2) # (nsum, H) 
 
         # Attention
+        # bag_size等于0表示一个batch中包含的若干bag数量可以不同，输入维度是(B,H)
+        # bag_size不等于0表示每个输入包含batch_size个bag，也就是每个bag包含batch_size个样本，输入维度(batch_size*bag, H)
         if train:
             if bag_size == 0:
                 # weight是不同关系对应的嵌入矩阵，(N, H)
@@ -133,13 +135,17 @@ class BagAttention(BagRE):
                 bag_rep = (softmax_att_score.unsqueeze(-1) * rep).sum(1) # (B, bag, 1) * (B, bag, H) -> (B, bag, H) -> (B, H)
             bag_rep = self.drop(bag_rep)
             bag_logits = self.fc(bag_rep) # (B, N)
+        # test
+        # 句子没有对应的关系label
         else:
             if bag_size == 0:
                 bag_logits = []
                 att_score = torch.matmul(rep, self.fc.weight.data.transpose(0, 1)) # (nsum, H) * (H, N) -> (nsum, N)
                 for i in range(len(scope)):
                     bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
+                    # 对于每个关系每个样本对应的权重是多少
                     softmax_att_score = self.softmax(att_score[scope[i][0]:scope[i][1]].transpose(0, 1)) # (N, (softmax)n) 
+                    # 根据n个句子的嵌入向量计算出每个关系对应的嵌入向量
                     rep_for_each_rel = torch.matmul(softmax_att_score, bag_mat) # (N, n) * (n, H) -> (N, H)
                     logit_for_each_rel = self.softmax(self.fc(rep_for_each_rel)) # ((each rel)N, (logit)N)
                     logit_for_each_rel = logit_for_each_rel.diag() # (N)
